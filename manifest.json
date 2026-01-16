@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "HunterKiller",
+  "version": "1.0.0",
+  "description": "Elite email discovery tool. Extract contacts from any domain.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "HunterKiller"
+  },
+  "background": {
+    "scripts": ["js/background.js"]
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "hunterkiller@youremail.com"
+    }
+  }
+}
