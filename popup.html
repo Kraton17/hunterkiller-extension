@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -5,243 +6,225 @@
     <title>HunterKiller</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/popup.css">
 </head>
 <body>
     <div class="app">
         <!-- Header -->
         <header class="header">
-            <div class="brand">
-                <div class="brand-icon">⚡</div>
-                <div class="brand-text">
-                    <div class="brand-name">HunterKiller</div>
-                    <div class="brand-tag">Email Discovery</div>
-                </div>
+            <div class="logo">
+                <h1>HunterKiller</h1>
+                <p>Email Discovery</p>
             </div>
-            <div class="status-badge">
-                <div class="status-dot"></div>
-                <span>READY</span>
+            <div class="status">
+                <span class="status-dot"></span>
+                <span>Ready</span>
             </div>
         </header>
 
-        <!-- Main Content -->
-        <div class="content">
+        <!-- Main -->
+        <main class="main">
             <!-- Domain Input -->
-            <div class="section">
-                <div class="section-header">
-                    <span class="section-icon">🎯</span>
-                    <span class="section-title">Target Domain</span>
-                </div>
-                <div class="input-group">
+            <section class="section">
+                <label class="label">Target Domain</label>
+                <div class="input-wrapper">
                     <input 
                         type="text" 
                         id="domain" 
-                        class="domain-input" 
+                        class="input" 
                         placeholder="example.com"
                         spellcheck="false"
                     >
-                    <button class="auto-detect" id="autoDetect" title="Detect current site">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                            <circle cx="12" cy="10" r="3"/>
+                    <button class="btn-icon" id="autoDetect" title="Auto-detect">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <circle cx="12" cy="12" r="3"/>
                         </svg>
                     </button>
                 </div>
-            </div>
+            </section>
 
-            <!-- Scan Config -->
-            <div class="section">
-                <div class="section-header">
-                    <span class="section-icon">⚙️</span>
-                    <span class="section-title">Configuration</span>
+            <!-- Domain Info -->
+            <div class="info-card" id="domainInfo" style="display: none;">
+                <div class="info-row">
+                    <span class="info-label">IP Address</span>
+                    <span class="info-value" id="domainIP">-</span>
                 </div>
-                <div class="config-grid">
-                    <div class="config-item">
-                        <label>Depth</label>
-                        <select id="depth" class="select">
-                            <option value="2">2 levels</option>
-                            <option value="3" selected>3 levels</option>
-                            <option value="5">5 levels</option>
-                            <option value="10">10 levels</option>
-                        </select>
-                    </div>
-                    <div class="config-item">
-                        <label>Max Pages</label>
-                        <select id="maxPages" class="select">
-                            <option value="50">50 pages</option>
-                            <option value="100" selected>100 pages</option>
-                            <option value="200">200 pages</option>
-                            <option value="500">500 pages</option>
-                        </select>
-                    </div>
+                <div class="info-row">
+                    <span class="info-label">Registrar</span>
+                    <span class="info-value" id="domainRegistrar">-</span>
                 </div>
             </div>
 
-            <!-- Methods -->
-            <div class="section">
-                <div class="section-header">
-                    <span class="section-icon">🔧</span>
-                    <span class="section-title">Discovery Methods</span>
-                </div>
-                <div class="methods">
-                    <label class="method-item checked">
-                        <input type="checkbox" name="method" value="crawl" checked>
-                        <div class="method-content">
-                            <div class="method-icon">🕸️</div>
-                            <div class="method-name">Web Crawl</div>
-                        </div>
-                        <div class="method-check">✓</div>
+            <!-- Scan Mode -->
+            <section class="section">
+                <label class="label">Scan Intensity</label>
+                <div class="mode-selector">
+                    <label class="mode">
+                        <input type="radio" name="scanMode" value="low" checked>
+                        <span class="mode-label">
+                            <strong>Low</strong>
+                            <small>Fast • 30 pages • ~30s</small>
+                        </span>
                     </label>
-                    <label class="method-item checked">
-                        <input type="checkbox" name="method" value="dns" checked>
-                        <div class="method-content">
-                            <div class="method-icon">🔍</div>
-                            <div class="method-name">DNS Lookup</div>
-                        </div>
-                        <div class="method-check">✓</div>
+                    <label class="mode">
+                        <input type="radio" name="scanMode" value="medium">
+                        <span class="mode-label">
+                            <strong>Medium</strong>
+                            <small>Balanced • 100 pages • ~2m</small>
+                        </span>
                     </label>
-                    <label class="method-item checked">
-                        <input type="checkbox" name="method" value="whois" checked>
-                        <div class="method-content">
-                            <div class="method-icon">📡</div>
-                            <div class="method-name">WHOIS Data</div>
-                        </div>
-                        <div class="method-check">✓</div>
-                    </label>
-                    <label class="method-item checked">
-                        <input type="checkbox" name="method" value="pdf" checked>
-                        <div class="method-content">
-                            <div class="method-icon">📄</div>
-                            <div class="method-name">PDF Extract</div>
-                        </div>
-                        <div class="method-check">✓</div>
-                    </label>
-                    <label class="method-item">
-                        <input type="checkbox" name="method" value="verify">
-                        <div class="method-content">
-                            <div class="method-icon">✅</div>
-                            <div class="method-name">Email Verify</div>
-                        </div>
-                        <div class="method-check">✓</div>
-                    </label>
-                    <label class="method-item">
-                        <input type="checkbox" name="method" value="social">
-                        <div class="method-content">
-                            <div class="method-icon">👥</div>
-                            <div class="method-name">Social Media</div>
-                        </div>
-                        <div class="method-check">✓</div>
+                    <label class="mode">
+                        <input type="radio" name="scanMode" value="high">
+                        <span class="mode-label">
+                            <strong>High</strong>
+                            <small>Deep • 500 pages • ~10m</small>
+                        </span>
                     </label>
                 </div>
-            </div>
+            </section>
+
+            <!-- Options -->
+            <section class="section">
+                <label class="label">Options</label>
+                <div class="options">
+                    <label class="checkbox">
+                        <input type="checkbox" id="verifyEmails" checked>
+                        <span class="checkbox-box"></span>
+                        <span class="checkbox-label">
+                            <strong>Verify Emails</strong>
+                            <small>Check if emails are valid</small>
+                        </span>
+                    </label>
+                    <label class="checkbox">
+                        <input type="checkbox" id="extractSocial">
+                        <span class="checkbox-box"></span>
+                        <span class="checkbox-label">
+                            <strong>Social Media</strong>
+                            <small>Find social profiles</small>
+                        </span>
+                    </label>
+                </div>
+            </section>
 
             <!-- Scan Button -->
-            <button class="scan-btn" id="scanBtn">
-                <span class="btn-icon">🚀</span>
-                <span class="btn-text">Start Scan</span>
+            <button class="btn-primary" id="scanBtn">
+                <span>Start Scan</span>
             </button>
 
             <!-- Progress -->
-            <div class="progress-container" id="progress" style="display: none;">
-                <div class="progress-info">
-                    <span class="progress-label">Scanning...</span>
-                    <span class="progress-percent" id="progressPercent">0%</span>
+            <div class="progress-card" id="progress" style="display: none;">
+                <div class="progress-header">
+                    <span id="progressStatus">Scanning...</span>
+                    <span id="progressPercent">0%</span>
                 </div>
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
-                <div class="progress-status" id="progressStatus">Initializing...</div>
-                <div class="progress-stats">
+                <div class="stats">
                     <div class="stat">
-                        <div class="stat-value" id="emailsStat">0</div>
-                        <div class="stat-label">Emails</div>
+                        <span class="stat-value" id="emailsStat">0</span>
+                        <span class="stat-label">Emails</span>
                     </div>
                     <div class="stat">
-                        <div class="stat-value" id="pagesStat">0</div>
-                        <div class="stat-label">Pages</div>
+                        <span class="stat-value" id="pagesStat">0</span>
+                        <span class="stat-label">Pages</span>
                     </div>
                     <div class="stat">
-                        <div class="stat-value" id="timeStat">0s</div>
-                        <div class="stat-label">Time</div>
+                        <span class="stat-value" id="timeStat">0s</span>
+                        <span class="stat-label">Time</span>
                     </div>
                 </div>
             </div>
 
             <!-- Results -->
-            <div class="results" id="results" style="display: none;">
+            <div class="results-card" id="results" style="display: none;">
                 <div class="results-header">
-                    <div class="results-title">
-                        <span>💀</span>
-                        <span>Found <strong id="totalCount">0</strong> emails</span>
-                    </div>
-                    <div class="results-actions">
-                        <button class="icon-btn" id="copyAll" title="Copy all">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                            </svg>
-                        </button>
-                        <button class="icon-btn" id="exportCSV" title="Export CSV">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                <polyline points="7 10 12 15 17 10"/>
-                                <line x1="12" y1="15" x2="12" y2="3"/>
-                            </svg>
-                        </button>
-                        <button class="icon-btn" id="clearResults" title="Clear">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"/>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                            </svg>
-                        </button>
+                    <h3>Found <span id="totalCount">0</span> Emails</h3>
+                    <div class="actions">
+                        <button class="btn-sm" id="verifyAll">Verify All</button>
+                        <button class="btn-sm" id="copyAll">Copy All</button>
+                        <button class="btn-sm" id="exportCSV">Export</button>
+                        <button class="btn-sm danger" id="clearResults">Clear</button>
                     </div>
                 </div>
-                <div class="results-search">
-                    <input type="text" id="searchResults" class="search-input" placeholder="Filter results...">
-                </div>
-                <div class="results-list" id="resultsList"></div>
-            </div>
-        </div>
 
-        <!-- Settings Button -->
-        <button class="settings-btn" id="settingsBtn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab active" data-tab="domain">
+                        Domain (<span id="domainCount">0</span>)
+                    </button>
+                    <button class="tab" data-tab="external">
+                        External (<span id="externalCount">0</span>)
+                    </button>
+                    <button class="tab" data-tab="social">
+                        Social (<span id="socialCount">0</span>)
+                    </button>
+                    <button class="tab" data-tab="info">
+                        Info
+                    </button>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="tab-content active" id="domainTab">
+                    <input type="text" id="searchDomain" class="search" placeholder="Filter emails...">
+                    <div class="email-list" id="domainList"></div>
+                </div>
+
+                <div class="tab-content" id="externalTab">
+                    <input type="text" id="searchExternal" class="search" placeholder="Filter emails...">
+                    <div class="email-list" id="externalList"></div>
+                </div>
+
+                <div class="tab-content" id="socialTab">
+                    <div class="social-list" id="socialList"></div>
+                </div>
+
+                <div class="tab-content" id="infoTab">
+                    <div class="info-panel" id="infoPanel"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Settings -->
+        <button class="settings-trigger" id="settingsBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3"/>
-                <path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m0 6l4.2 4.2m5.2-9.2h-6m-6 0H1m13.2 5.2l-4.2-4.2m0-6l-4.2-4.2"/>
+                <path d="M12 1v6m0 6v6m5-13l-4 4m0 6l4 4m5-9h-6m-6 0H1m13 5l-4-4m0-6l-4-4"/>
             </svg>
         </button>
 
         <!-- Settings Panel -->
         <div class="settings-panel" id="settingsPanel" style="display: none;">
-            <div class="settings-header">
-                <h3>Settings</h3>
-                <button class="close-settings" id="closeSettings">✕</button>
+            <div class="panel-header">
+                <h2>Settings</h2>
+                <button class="btn-close" id="closeSettings">×</button>
             </div>
-            <div class="settings-content">
-                <div class="setting-item">
+            <div class="panel-content">
+                <div class="field">
                     <label>Request Delay (ms)</label>
-                    <input type="number" id="reqDelay" value="300" min="0" max="5000" class="setting-input">
+                    <input type="number" id="reqDelay" value="300" min="0" max="5000">
                 </div>
-                <div class="setting-item">
+                <div class="field">
                     <label>Timeout (seconds)</label>
-                    <input type="number" id="timeout" value="10" min="1" max="60" class="setting-input">
+                    <input type="number" id="timeout" value="10" min="1" max="60">
                 </div>
-                <div class="setting-item">
-                    <label class="switch">
+                <div class="field">
+                    <label class="checkbox">
                         <input type="checkbox" id="followRedirects" checked>
-                        <span class="slider"></span>
-                        <span class="switch-label">Follow Redirects</span>
+                        <span class="checkbox-box"></span>
+                        <span class="checkbox-label">Follow Redirects</span>
                     </label>
                 </div>
-                <div class="setting-item">
-                    <label class="switch">
-                        <input type="checkbox" id="aggressiveMode">
-                        <span class="slider"></span>
-                        <span class="switch-label">Aggressive Mode</span>
+                <div class="field">
+                    <label class="checkbox">
+                        <input type="checkbox" id="strictValidation" checked>
+                        <span class="checkbox-box"></span>
+                        <span class="checkbox-label">Strict Validation</span>
                     </label>
                 </div>
-                <button class="save-settings" id="saveSettings">Save Settings</button>
+                <button class="btn-primary" id="saveSettings">Save Settings</button>
             </div>
         </div>
 

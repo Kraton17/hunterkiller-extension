@@ -1,7 +1,7 @@
-// HunterKiller Background Service Worker
-// IMPROVED EMAIL DETECTION FOR kristujayanti.edu.in
+// HunterKiller v3.0 - Background Scanner Engine
+// SIMPLIFIED: Web Crawl + Email Verify + Social Media (optional)
+// Removed: DNS, WHOIS, PDF extraction
 
-// Get browser API (works in both Chrome and Firefox)
 const browserAPI = typeof browser !== 'undefined' ? browser : chrome;
 
 class HunterKiller {
@@ -13,12 +13,12 @@ class HunterKiller {
     setupListeners() {
         browserAPI.runtime.onMessage.addListener((request, sender, sendResponse) => {
             this.handleMessage(request, sender, sendResponse);
-            return true; // Keep channel open for async
+            return true;
         });
     }
 
     async handleMessage(request, sender, sendResponse) {
-        console.log('Background received message:', request);
+        console.log('Background received:', request);
         
         const { action, data } = request;
 
@@ -45,7 +45,6 @@ class HunterKiller {
         
         this.activeScans.set(scanId, scanner);
         
-        // Start scanning
         scanner.start().catch(error => {
             console.error('Scan error:', error);
             scanner.status = 'error';
@@ -55,7 +54,7 @@ class HunterKiller {
         sendResponse({ 
             success: true, 
             scanId,
-            message: 'Scan started'
+            message: 'Scan started in ' + config.scanMode + ' mode'
         });
     }
 
@@ -71,10 +70,12 @@ class HunterKiller {
             status: scanner.status,
             progress: scanner.progress,
             currentAction: scanner.currentAction,
-            emails: Array.from(scanner.emails),
-            phones: Array.from(scanner.phones),
+            domainEmails: Array.from(scanner.domainEmails),
+            externalEmails: Array.from(scanner.externalEmails),
+            socialLinks: scanner.socialLinks,
             pagesScanned: scanner.visitedUrls.size,
-            timeElapsed: scanner.getElapsedTime()
+            timeElapsed: scanner.getElapsedTime(),
+            scanInfo: scanner.scanInfo
         };
     }
 }
@@ -82,85 +83,124 @@ class HunterKiller {
 class DomainScanner {
     constructor(scanId, config) {
         this.scanId = scanId;
-        this.domain = config.domain;
-        this.maxDepth = config.maxDepth || 3;
-        this.maxPages = config.maxPages || 100;
-        this.techniques = config.techniques || [];
+        this.targetDomain = config.domain;
+        this.scanMode = config.scanMode || 'low';
+        this.verifyEmails = config.verifyEmails !== false;
+        this.extractSocial = config.extractSocial || false;
         
-        this.emails = new Set();
-        this.phones = new Set();
+        // Extract base domain for smart matching
+        this.baseDomainName = this.extractBaseDomainName(this.targetDomain);
+        
+        // Mode configurations
+        const modeConfig = {
+            low: { maxDepth: 2, maxPages: 30, delay: 200 },
+            medium: { maxDepth: 3, maxPages: 100, delay: 300 },
+            high: { maxDepth: 5, maxPages: 500, delay: 400 }
+        };
+        
+        const cfg = modeConfig[this.scanMode];
+        this.maxDepth = cfg.maxDepth;
+        this.maxPages = cfg.maxPages;
+        this.requestDelay = cfg.delay;
+        
+        // Email storage - categorized
+        this.domainEmails = new Set();
+        this.externalEmails = new Set();
+        this.socialLinks = [];
+        
         this.visitedUrls = new Set();
         this.queue = [];
         
         this.status = 'running';
         this.progress = 0;
-        this.currentAction = 'Initializing...';
+        this.currentAction = 'Initializing';
         this.startTime = Date.now();
+        
+        // Scan info
+        this.scanInfo = {
+            ip: null,
+            registrar: null,
+            pagesScanned: 0,
+            duration: null
+        };
 
-        // IMPROVED EMAIL PATTERNS - More aggressive
+        // EMAIL PATTERNS
         this.emailPatterns = [
-            // Standard email
             /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi,
-            // Mailto links
             /mailto:([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})/gi,
-            // Obfuscated with [at] and [dot]
             /[A-Za-z0-9._%+-]+\s*\[\s*at\s*\]\s*[A-Za-z0-9.-]+\s*\[\s*dot\s*\]\s*[A-Z|a-z]{2,}/gi,
-            // Obfuscated with (at) and (dot)
             /[A-Za-z0-9._%+-]+\s*\(\s*at\s*\)\s*[A-Za-z0-9.-]+\s*\(\s*dot\s*\)\s*[A-Z|a-z]{2,}/gi,
-            // With spaces around @
-            /[A-Za-z0-9._%+-]+\s+@\s+[A-Za-z0-9.-]+\s+\.\s+[A-Z|a-z]{2,}/gi,
-            // JavaScript encoded
             /[A-Za-z0-9._%+-]+%40[A-Za-z0-9.-]+%2E[A-Z|a-z]{2,}/gi,
-            // HTML entities
             /[A-Za-z0-9._%+-]+&#64;[A-Za-z0-9.-]+&#46;[A-Z|a-z]{2,}/gi
         ];
 
-        this.phonePatterns = [
-            /\+?1?\s*\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})/g,
-            /\+(\d{1,3})\s*\(?(\d{1,4})\)?[-.\s]?(\d{1,4})[-.\s]?(\d{4,})/g,
-            /(\d{10})/g
+        // STRICT FALSE POSITIVE FILTERS
+        this.invalidPatterns = [
+            /^(example|test|sample|demo|dummy|user|admin)@/i,
+            /@(example\.com|test\.com|domain\.com|email\.com|localhost)$/i,
+            /\.(png|jpg|jpeg|gif|svg|css|js|json|xml|pdf|doc|zip)$/i,
+            /^(no-?reply|do-?not-?reply|noreply|donotreply|bounce|mailer-daemon)@/i,
+            /@(sentry|bugsnag|rollbar|datadog|segment|analytics)/i,
+            /^(wix|squarespace|wordpress|shopify|weebly|jimdo)@/i,
+            /@[a-z]{1,2}\.[a-z]{2}$/i,
+            /^.{1,2}@/,
+            /@.{1,2}\./
         ];
+
+        // SOCIAL MEDIA PATTERNS
+        this.socialPatterns = {
+            facebook: /(?:https?:\/\/)?(?:www\.)?facebook\.com\/[a-zA-Z0-9.]+/gi,
+            twitter: /(?:https?:\/\/)?(?:www\.)?(?:twitter|x)\.com\/[a-zA-Z0-9_]+/gi,
+            linkedin: /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/(?:in|company)\/[a-zA-Z0-9-]+/gi,
+            instagram: /(?:https?:\/\/)?(?:www\.)?instagram\.com\/[a-zA-Z0-9._]+/gi,
+            youtube: /(?:https?:\/\/)?(?:www\.)?youtube\.com\/(?:c|channel|user)\/[a-zA-Z0-9_-]+/gi,
+            github: /(?:https?:\/\/)?(?:www\.)?github\.com\/[a-zA-Z0-9-]+/gi
+        };
+    }
+
+    extractBaseDomainName(domain) {
+        const parts = domain.split('.');
+        if (parts.length === 2) {
+            return parts[0];
+        }
+        return parts[0];
     }
 
     async start() {
         try {
-            this.currentAction = 'Starting scan...';
+            this.currentAction = 'Starting ' + this.scanMode + ' mode scan';
             this.progress = 5;
 
-            // Quick methods first
-            if (this.techniques.includes('dns')) {
-                await this.dnsLookup();
-            }
-            this.progress = 15;
+            // Get domain IP
+            await this.getDomainInfo();
+            this.progress = 10;
 
-            if (this.techniques.includes('whois')) {
-                await this.whoisLookup();
-            }
-            this.progress = 25;
-
-            // Deep crawl - MAIN METHOD
-            if (this.techniques.includes('crawl')) {
-                await this.crawlWebsite();
-            }
+            // Main web crawl (CORE METHOD)
+            this.currentAction = 'Crawling website';
+            await this.crawlWebsite();
             this.progress = 90;
 
-            // Additional methods
-            if (this.techniques.includes('pdf')) {
-                await this.extractFromPDFs();
-            }
-
-            if (this.techniques.includes('verify')) {
-                await this.verifyEmails();
+            // Extract social media (if enabled)
+            if (this.extractSocial) {
+                this.currentAction = 'Extracting social profiles';
+                this.extractSocialMedia();
             }
 
             this.progress = 100;
             this.status = 'completed';
-            this.currentAction = `Completed! Found ${this.emails.size} emails`;
+            
+            const totalEmails = this.domainEmails.size + this.externalEmails.size;
+            this.currentAction = `Completed - Found ${totalEmails} emails`;
+            
+            // Update scan info
+            this.scanInfo.pagesScanned = this.visitedUrls.size;
+            this.scanInfo.duration = this.getElapsedTime() + 's';
             
             console.log('Scan completed:', {
-                emails: Array.from(this.emails),
-                phones: Array.from(this.phones),
-                pages: this.visitedUrls.size
+                domainEmails: Array.from(this.domainEmails),
+                externalEmails: Array.from(this.externalEmails),
+                socialLinks: this.socialLinks,
+                scanInfo: this.scanInfo
             });
 
         } catch (error) {
@@ -171,62 +211,43 @@ class DomainScanner {
         }
     }
 
+    async getDomainInfo() {
+        this.currentAction = 'Getting domain info';
+        
+        try {
+            // Get IP address
+            const ipResponse = await fetch(`https://dns.google/resolve?name=${this.targetDomain}&type=A`);
+            const ipData = await ipResponse.json();
+            
+            if (ipData.Answer && ipData.Answer.length > 0) {
+                this.scanInfo.ip = ipData.Answer[0].data;
+                console.log('Domain IP:', this.scanInfo.ip);
+            }
+            
+            // Set default registrar
+            this.scanInfo.registrar = 'Unknown (DNS only)';
+            
+        } catch (error) {
+            console.log('Failed to get IP:', error);
+        }
+    }
+
     getElapsedTime() {
         return Math.floor((Date.now() - this.startTime) / 1000);
     }
 
-    async dnsLookup() {
-        this.currentAction = 'DNS lookup...';
-        try {
-            const response = await fetch(`https://dns.google/resolve?name=${this.domain}&type=TXT`);
-            const data = await response.json();
-            
-            if (data.Answer) {
-                data.Answer.forEach(record => {
-                    if (record.data) {
-                        this.extractEmails(record.data);
-                    }
-                });
-            }
-        } catch (error) {
-            console.log('DNS lookup failed:', error);
-        }
-    }
-
-    async whoisLookup() {
-        this.currentAction = 'WHOIS lookup...';
-        // Note: WHOIS API requires key, skipping for now
-        console.log('WHOIS lookup skipped (requires API key)');
-    }
-
     async crawlWebsite() {
-        this.currentAction = 'Crawling website...';
+        this.currentAction = 'Crawling website';
         
-        const baseUrl = `https://${this.domain}`;
+        const baseUrl = `https://${this.targetDomain}`;
         
-        // Start with homepage
         this.queue = [{ url: baseUrl, depth: 0 }];
 
-        // Add common contact pages - IMPORTANT for finding emails
+        // Common contact pages
         const commonPaths = [
-            '/',
-            '/contact',
-            '/contact-us',
-            '/contactus',
-            '/about',
-            '/about-us',
-            '/team',
-            '/people',
-            '/staff',
-            '/faculty',
-            '/administration',
-            '/leadership',
-            '/careers',
-            '/support',
-            '/help',
-            '/info',
-            '/email',
-            '/directory'
+            '/', '/contact', '/contact-us', '/contactus', '/about', '/about-us',
+            '/team', '/people', '/staff', '/faculty', '/administration',
+            '/leadership', '/careers', '/support', '/help', '/directory'
         ];
         
         commonPaths.forEach(path => {
@@ -242,8 +263,7 @@ class DomainScanner {
 
             await this.crawlPage(url, depth);
             
-            // Update progress
-            this.progress = 25 + (this.visitedUrls.size / this.maxPages * 65);
+            this.progress = 10 + (this.visitedUrls.size / this.maxPages * 80);
         }
     }
 
@@ -252,8 +272,6 @@ class DomainScanner {
         
         this.visitedUrls.add(url);
         this.currentAction = `Scanning: ${new URL(url).pathname}`;
-
-        console.log('Crawling:', url);
 
         try {
             const response = await fetch(url, {
@@ -264,25 +282,22 @@ class DomainScanner {
             });
 
             if (!response.ok) {
-                console.log(`Failed to fetch ${url}:`, response.status);
                 return;
             }
 
             const html = await response.text();
             
-            console.log(`Fetched ${url}, length: ${html.length}`);
-            
-            // Extract emails and phones - AGGRESSIVE
+            // Extract emails
             this.extractEmails(html);
-            this.extractPhones(html);
-            
-            // Also check for JavaScript variables containing emails
             this.extractFromJavaScript(html);
-            
-            // Also check meta tags
             this.extractFromMetaTags(html);
+            
+            // Extract social media (if enabled)
+            if (this.extractSocial) {
+                this.extractSocialFromPage(html);
+            }
 
-            // Find more links if not at max depth
+            // Find more links
             if (depth < this.maxDepth) {
                 const links = this.extractLinks(html, url);
                 links.forEach(link => {
@@ -292,8 +307,7 @@ class DomainScanner {
                 });
             }
 
-            // Small delay
-            await this.delay(300);
+            await this.delay(this.requestDelay);
 
         } catch (error) {
             console.error(`Error crawling ${url}:`, error);
@@ -308,30 +322,25 @@ class DomainScanner {
                 email = this.cleanEmail(email);
                 
                 if (this.isValidEmail(email)) {
-                    // Don't filter by domain for debugging
-                    this.emails.add(email.toLowerCase());
-                    console.log('Found email:', email);
+                    this.categorizeEmail(email);
                 }
             }
         });
     }
 
     extractFromJavaScript(html) {
-        // Look for emails in JavaScript variables
         const jsEmailPattern = /['"]([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})['"]/g;
         const matches = html.matchAll(jsEmailPattern);
         
         for (const match of matches) {
             const email = this.cleanEmail(match[1]);
             if (this.isValidEmail(email)) {
-                this.emails.add(email.toLowerCase());
-                console.log('Found email in JS:', email);
+                this.categorizeEmail(email);
             }
         }
     }
 
     extractFromMetaTags(html) {
-        // Extract from meta tags
         const metaPattern = /<meta[^>]+content=["']([^"']*@[^"']*)["'][^>]*>/gi;
         const matches = html.matchAll(metaPattern);
         
@@ -340,8 +349,27 @@ class DomainScanner {
         }
     }
 
+    extractSocialFromPage(html) {
+        Object.entries(this.socialPatterns).forEach(([platform, pattern]) => {
+            const matches = html.matchAll(pattern);
+            for (const match of matches) {
+                const url = match[0];
+                if (!this.socialLinks.find(s => s.url === url)) {
+                    this.socialLinks.push({
+                        platform: platform.charAt(0).toUpperCase() + platform.slice(1),
+                        url: url
+                    });
+                }
+            }
+        });
+    }
+
+    extractSocialMedia() {
+        this.currentAction = `Found ${this.socialLinks.length} social profiles`;
+    }
+
     cleanEmail(email) {
-        email = email.trim();
+        email = email.trim().toLowerCase();
         email = email.replace(/\[at\]/gi, '@');
         email = email.replace(/\(at\)/gi, '@');
         email = email.replace(/\s+at\s+/gi, '@');
@@ -357,25 +385,86 @@ class DomainScanner {
     }
 
     isValidEmail(email) {
+        // Basic format check
         const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$/;
-        return emailRegex.test(email) && 
-               !email.includes('noreply') && 
-               !email.includes('no-reply') &&
-               !email.includes('example.com') &&
-               !email.includes('test@') &&
-               !email.includes('admin@localhost');
+        if (!emailRegex.test(email)) {
+            return false;
+        }
+
+        // Check against false positive patterns
+        for (const pattern of this.invalidPatterns) {
+            if (pattern.test(email)) {
+                console.log('Rejected false positive:', email);
+                return false;
+            }
+        }
+
+        // Strict validation
+        if (email.length < 6 || email.length > 254) {
+            return false;
+        }
+
+        const parts = email.split('@');
+        if (parts.length !== 2) {
+            return false;
+        }
+
+        const [localPart, domain] = parts;
+        
+        // Local part must be at least 3 characters
+        if (localPart.length < 3) {
+            console.log('Rejected (local part too short):', email);
+            return false;
+        }
+
+        // Domain validation
+        if (domain.length < 4) {
+            console.log('Rejected (domain too short):', email);
+            return false;
+        }
+
+        // Must have at least one dot
+        if (!domain.includes('.')) {
+            return false;
+        }
+
+        // Check for consecutive dots
+        if (email.includes('..')) {
+            return false;
+        }
+
+        // TLD must be at least 2 characters
+        const domainParts = domain.split('.');
+        const tld = domainParts[domainParts.length - 1];
+        if (tld.length < 2) {
+            console.log('Rejected (TLD too short):', email);
+            return false;
+        }
+
+        return true;
     }
 
-    extractPhones(text) {
-        this.phonePatterns.forEach(pattern => {
-            const matches = text.matchAll(new RegExp(pattern));
-            for (const match of matches) {
-                const phone = match[0].trim();
-                if (phone.length >= 10) {
-                    this.phones.add(phone);
-                }
-            }
-        });
+    categorizeEmail(email) {
+        const emailDomain = email.split('@')[1];
+        
+        // SMART DOMAIN MATCHING
+        // Direct match
+        if (emailDomain === this.targetDomain || emailDomain.endsWith('.' + this.targetDomain)) {
+            this.domainEmails.add(email);
+            console.log('Domain email (exact match):', email);
+            return;
+        }
+        
+        // Smart match - check if base domain name appears
+        if (emailDomain.includes(this.baseDomainName)) {
+            this.domainEmails.add(email);
+            console.log('Domain email (smart match):', email);
+            return;
+        }
+        
+        // External
+        this.externalEmails.add(email);
+        console.log('External email:', email);
     }
 
     extractLinks(html, baseUrl) {
@@ -390,7 +479,6 @@ class DomainScanner {
                 const parsedUrl = new URL(absoluteUrl);
                 const baseDomain = new URL(baseUrl).hostname;
 
-                // Only follow links on same domain
                 if (parsedUrl.hostname === baseDomain) {
                     links.push(absoluteUrl);
                 }
@@ -402,16 +490,6 @@ class DomainScanner {
         return links;
     }
 
-    async extractFromPDFs() {
-        this.currentAction = 'Extracting from PDFs...';
-        console.log('PDF extraction not fully implemented yet');
-    }
-
-    async verifyEmails() {
-        this.currentAction = 'Verifying emails...';
-        console.log('Email verification not fully implemented yet');
-    }
-
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -419,4 +497,5 @@ class DomainScanner {
 
 // Initialize
 const hunterKiller = new HunterKiller();
-console.log('HunterKiller background service initialized');
+console.log('HunterKiller v3.0 background service initialized');
+console.log('Methods: Web Crawl + Email Verify + Social Media (optional)');
